@@ -1,5 +1,7 @@
-from flask import Flask, render_template
-from .models import DB,User,Tweet
+from flask import Flask, render_template, request
+from .models import DB, User, Tweet
+from .twitter import add_or_update_user 
+from .predict import predict_user
 
 def create_app():
 
@@ -11,17 +13,11 @@ def create_app():
     # Register aour dtabas ewith teha pp
     DB.init_app(app)
 
-    my_var="Twitoff App"
-
     @app.route('/')
     def root():
         users = User.query.all()
         
         return render_template("base.html",title="Home", users=users)
-
-    @app.route('/bananas')
-    def bananas():
-        return "This is the bananas page"
 
     @app.route('/reset')
     def reset():
@@ -30,21 +26,56 @@ def create_app():
         # Recreate all database tables accordint tothe
         # indicate shema in models.py
         DB.create_all()
-        return "dabase has been reset "
-    @app.route('/populate')
-    def populate():
-        ryan = User(id=1, username='ryan')
-        DB.session.add(ryan)
-        julian = User(id=2, username='julian')
-        DB.session.add(julian)
+        return render_template('base.html',title='Reset Database')
 
-        #tweets
-        tweet1 = Tweet(id=1, text= "ryan's tweet text", user=ryan)
-        DB.session.add(tweet1)
-        tweet2 = Tweet(id=2, text= "julian's tweet text", user=julian)
-        DB.session.add(tweet2)
-        # save changes to dtabase
-        DB.session.commit()
+    @app.route('/update')
+    def update():
+        #get list of usernames of all users
+        usernames=[]
+        users = User.query.all()
+        for user in users:
+            usernames.append(user.username)
 
-        return "database has been populated"
+        for username in usernames:
+            add_or_update_user(username)
+
+        return render_template('base.html',title="Users Updated")
+    
+    @app.route('/user', methods={'POST'})
+    @app.route('/user/<username>', methods={'GET'})
+    def user(username=None, message=''):
+    
+        username = username or request.values['user_name']
+
+        try:
+            if request.method == 'POST':
+                add_or_update_user(username)
+                message = f'User "{username}" has been successfully added!'
+            
+                tweets = User.query.filter(User.username==username).one().tweets
+
+        except Exception as e:
+            message = f"Error adding{username}: {e}"
+            tweets = []
+            
+        return render_template('user.html', title=username, tweets=tweets, message=message)
+
+    @app.route('/compare', methods=['POST'])
+    def compare():
+        user0, user1 = sorted([request.values['user0'], request.values['user1']])
+        hypo_tweet_text = request.values["tweet_text"]
+        
+        if user0 == user1:
+            message = "Cannot compare a user to themselves!"
+        else: 
+            prediction= predict_user(user0, user1, hypo_tweet_text)
+            
+            #get into the if statment if the prediction is user1
+            if prediction: 
+                message = f"{hypo_tweet_text} is more likely to be said by {user0} than by {user1}"
+                
+            else: 
+                message = f"{hypo_tweet_text} is more likely to be said by {user1} than by {user0}"
+
+        return render_template("prediction.html", title="Prediction", message=message)
     return app

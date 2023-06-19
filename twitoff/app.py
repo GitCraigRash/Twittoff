@@ -72,10 +72,10 @@ def create_app():
             
             #get into the if statment if the prediction is user1
             if prediction: 
-                message = f"{hypo_tweet_text} is more likely to be said by {user0} than by {user1}"
+                message = f"{hypo_tweet_text} is more likely to be said by {user1} than by {user0}"
                 
             else: 
-                message = f"{hypo_tweet_text} is more likely to be said by {user1} than by {user0}"
+                message = f"{hypo_tweet_text} is more likely to be said by {user0} than by {user1}"
 
         return render_template("prediction.html", title="Prediction", message=message)
     return app
